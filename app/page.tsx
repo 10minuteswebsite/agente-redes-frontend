@@ -198,7 +198,7 @@ export default function Chat() {
             className="flex-1 resize-none rounded-2xl border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-900 placeholder-neutral-400 outline-none focus:border-neutral-500"
           />
           <button
-            onClick={enviar}
+            onClick={() => enviar()}
             disabled={cargando || !input.trim()}
             className="rounded-2xl bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
           >
