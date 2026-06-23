@@ -1,65 +1,211 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+const CHAT_WEBHOOK = "https://n8n-qa.10minuteswebsite.net/webhook/seo-chat";
+
+type Mensaje = { rol: "user" | "agente"; texto: string };
+
+const IMAGE_URL_PATTERN = /https?:\/\/\S+\.(?:png|jpg|jpeg|webp|gif)(?:\?\S*)?/i;
+
+function renderConImagenes(texto: string) {
+  const partes = texto.split(new RegExp(`(${IMAGE_URL_PATTERN.source})`, "gi"));
+  return partes.map((parte, i) =>
+    IMAGE_URL_PATTERN.test(parte) ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        key={i}
+        src={parte}
+        alt="Borrador generado"
+        className="mt-2 max-w-full rounded-xl border border-neutral-200"
+      />
+    ) : (
+      <span key={i}>{parte}</span>
+    )
+  );
+}
+
+export default function Chat() {
+  const router = useRouter();
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [verificando, setVerificando] = useState(true);
+  const [mensajes, setMensajes] = useState<Mensaje[]>([]);
+  const [input, setInput] = useState("");
+  const [cargando, setCargando] = useState(false);
+  const [esperandoBorradores, setEsperandoBorradores] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const id = sessionStorage.getItem("tenant_id");
+    if (!id) {
+      router.replace("/login");
+      return;
+    }
+    setTenantId(id);
+    setVerificando(false);
+  }, [router]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [mensajes]);
+
+  // Limpiar polling cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  async function enviar(textoMsg?: string) {
+    const mensaje = textoMsg || input.trim();
+    if (!mensaje || !tenantId || cargando) return;
+
+    // Si no es auto-polling, limpiar input y mostrar mensaje de usuario
+    if (!textoMsg) {
+      setMensajes((m) => [...m, { rol: "user", texto: mensaje }]);
+      setInput("");
+    }
+
+    setCargando(true);
+    try {
+      const res = await fetch(CHAT_WEBHOOK, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: Number(tenantId), mensaje }),
+      });
+      const data = await res.json();
+      const respuesta = data.respuesta || "Sin respuesta del agente.";
+
+      // No mostrar mensajes de polling automático
+      if (!textoMsg) {
+        setMensajes((m) => [...m, { rol: "agente", texto: respuesta }]);
+      }
+
+      // Detectar si estamos generando borradores
+      if (respuesta.includes("Iniciando generación")) {
+        setEsperandoBorradores(true);
+        // Auto-polling cada 3 segundos
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = setInterval(() => {
+          enviarAutoPoll();
+        }, 3000);
+      } else if (
+        respuesta.includes("están listos") ||
+        respuesta.includes("listo") ||
+        respuesta.includes("pendiente") ||
+        respuesta.includes("Aún no hay")
+      ) {
+        // Mostrar respuesta con borradores o estado de espera
+        setMensajes((m) => [...m, { rol: "agente", texto: respuesta }]);
+
+        // Si encontramos los borradores, parar polling
+        if (respuesta.includes("están listos")) {
+          setEsperandoBorradores(false);
+          if (pollingRef.current) clearInterval(pollingRef.current);
+        }
+      }
+    } catch (e) {
+      if (!textoMsg) {
+        setMensajes((m) => [
+          ...m,
+          { rol: "agente", texto: "Error de conexión. Intenta de nuevo." },
+        ]);
+      }
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function enviarAutoPoll() {
+    // Auto-polling silencioso
+    await enviar("¿Están listos los borradores?");
+  }
+
+  if (verificando || !tenantId) {
+    return (
+      <div className="flex h-screen items-center justify-center text-neutral-500">
+        Verificando acceso...
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="flex h-screen flex-col bg-white">
+      <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+        <h1 className="text-sm font-medium text-neutral-700">
+          Agente Redes SEO
+        </h1>
+        <Link
+          href="/conectar-redes"
+          className="text-sm text-neutral-500 hover:text-neutral-800"
+        >
+          Conectar redes
+        </Link>
+      </header>
+
+      <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="mx-auto flex max-w-2xl flex-col gap-4">
+          {mensajes.length === 0 && (
+            <div className="rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-600">
+              <p>
+                <strong>Paso 2 de 2.</strong> Pégame el artículo de tu blog que quieres
+                multiplicar en redes (título, resumen o link) y dime para cuáles
+                quieres las publicaciones — o dime &quot;todas&quot;.
+              </p>
+              <p className="mt-1 text-neutral-400">
+                ¿Ya tienes borradores generados? Pregúntame qué tienes pendiente, o
+                pídeme que apruebe, edite o regenere alguno.
+              </p>
+            </div>
+          )}
+          {mensajes.map((m, i) => (
+            <div
+              key={i}
+              className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+                m.rol === "user"
+                  ? "self-end bg-neutral-900 text-white"
+                  : "self-start bg-neutral-100 text-neutral-900"
+              }`}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              {renderConImagenes(m.texto)}
+            </div>
+          ))}
+          {cargando && (
+            <div className="self-start rounded-2xl bg-neutral-100 px-4 py-2 text-sm text-neutral-400">
+              Escribiendo...
+            </div>
+          )}
+          <div ref={bottomRef} />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      </div>
+
+      <div className="border-t border-neutral-200 px-4 py-4">
+        <div className="mx-auto flex max-w-2xl items-end gap-2">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                enviar();
+              }
+            }}
+            rows={1}
+            placeholder="Escribe tu mensaje..."
+            className="flex-1 resize-none rounded-2xl border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-900 placeholder-neutral-400 outline-none focus:border-neutral-500"
+          />
+          <button
+            onClick={enviar}
+            disabled={cargando || !input.trim()}
+            className="rounded-2xl bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            Enviar
+          </button>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
