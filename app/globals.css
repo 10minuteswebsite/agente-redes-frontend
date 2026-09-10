@@ -17,3 +17,15 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.yr-theme {
+  --yr-cream: #f6f1e9;
+  --yr-cream-soft: #fbf8f3;
+  --yr-border: #e6ddcd;
+  --yr-brown: #4a3626;
+  --yr-brown-soft: #6b5847;
+  --yr-olive: #6f7f45;
+  --yr-olive-soft: #8b9a63;
+  --yr-purple: #5c4a8c;
+  --yr-purple-soft: #7d6bab;
+}

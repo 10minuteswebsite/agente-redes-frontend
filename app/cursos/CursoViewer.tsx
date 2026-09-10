@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import BrandMark from "./BrandMark";
 import type { Curso, Leccion } from "./data";
 
 function claveProgreso(cursoSlug: string) {
@@ -50,16 +51,80 @@ export default function CursoViewer({
 }) {
   const { completadas, alternar } = useProgreso(curso.slug);
   const completada = completadas.includes(leccion.slug);
+  const total = curso.lecciones.length;
+  const vistas = completadas.length;
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 lg:flex-row">
-      <div className="flex-1">
-        <Link href="/cursos" className="text-sm text-neutral-500 hover:text-neutral-800">
-          ← Biblioteca de cursos
+    <div className="mx-auto flex min-h-screen max-w-6xl flex-col lg:flex-row">
+      <aside className="w-full shrink-0 border-b border-[var(--yr-border)] px-6 py-6 lg:w-80 lg:border-r lg:border-b-0">
+        <Link href="/cursos">
+          <BrandMark />
         </Link>
 
-        <h1 className="mt-2 text-xl font-semibold text-neutral-900">{curso.titulo}</h1>
-        <h2 className="text-sm text-neutral-500">{leccion.titulo}</h2>
+        <p className="mt-6 text-xs font-semibold tracking-[0.2em] text-[var(--yr-olive)] uppercase">
+          El curso en video
+        </p>
+        <h1 className="mt-1 font-[family-name:var(--font-display)] text-xl text-[var(--yr-brown)]">
+          {curso.titulo}
+        </h1>
+
+        <p className="mt-4 text-xs text-[var(--yr-brown-soft)]">
+          {vistas} / {total} {total === 1 ? "lección vista" : "lecciones vistas"}
+        </p>
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--yr-border)]">
+          <div
+            className="h-full rounded-full bg-[var(--yr-olive)] transition-all"
+            style={{ width: `${total ? (vistas / total) * 100 : 0}%` }}
+          />
+        </div>
+
+        <ol className="mt-6 flex flex-col gap-1">
+          {curso.lecciones.map((l) => {
+            const activa = l.slug === leccion.slug;
+            const hecha = completadas.includes(l.slug);
+            return (
+              <li key={l.slug}>
+                <Link
+                  href={`/cursos/${curso.slug}/${l.slug}`}
+                  className={`flex items-start gap-3 rounded-xl px-3 py-2 text-sm transition ${
+                    activa
+                      ? "bg-[var(--yr-cream-soft)] ring-1 ring-[var(--yr-border)]"
+                      : "hover:bg-[var(--yr-cream-soft)]"
+                  }`}
+                >
+                  <span
+                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
+                      hecha
+                        ? "border-[var(--yr-olive)] bg-[var(--yr-olive)] text-white"
+                        : "border-[var(--yr-brown-soft)]"
+                    }`}
+                  >
+                    {hecha ? "✓" : ""}
+                  </span>
+                  <span className="text-[var(--yr-brown)]">{l.titulo}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ol>
+      </aside>
+
+      <div className="flex-1 px-6 py-6">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="font-[family-name:var(--font-display)] text-lg text-[var(--yr-brown)]">
+            {leccion.titulo}
+          </h2>
+          <button
+            onClick={() => alternar(leccion.slug)}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition ${
+              completada
+                ? "bg-[var(--yr-olive)] text-white"
+                : "bg-[var(--yr-purple)] text-white hover:bg-[var(--yr-purple-soft)]"
+            }`}
+          >
+            {completada ? "✓ Vista" : "Marcar como vista"}
+          </button>
+        </div>
 
         <div className="mt-4 aspect-video w-full overflow-hidden rounded-2xl bg-black">
           <iframe
@@ -73,22 +138,11 @@ export default function CursoViewer({
         </div>
 
         <div className="mt-4 flex items-center justify-between">
-          <button
-            onClick={() => alternar(leccion.slug)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              completada
-                ? "bg-neutral-900 text-white"
-                : "border border-neutral-300 text-neutral-700 hover:border-neutral-500"
-            }`}
-          >
-            {completada ? "✓ Completado" : "Marcar como completado"}
-          </button>
-
           <div className="flex gap-2">
             {anterior && (
               <Link
                 href={`/cursos/${curso.slug}/${anterior.slug}`}
-                className="rounded-full border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:border-neutral-500"
+                className="rounded-full border border-[var(--yr-border)] px-4 py-2 text-sm text-[var(--yr-brown)] hover:border-[var(--yr-olive-soft)]"
               >
                 ← Anterior
               </Link>
@@ -96,7 +150,7 @@ export default function CursoViewer({
             {siguiente && (
               <Link
                 href={`/cursos/${curso.slug}/${siguiente.slug}`}
-                className="rounded-full bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
+                className="rounded-full bg-[var(--yr-brown)] px-4 py-2 text-sm text-white hover:bg-[var(--yr-brown-soft)]"
               >
                 Siguiente →
               </Link>
@@ -104,41 +158,6 @@ export default function CursoViewer({
           </div>
         </div>
       </div>
-
-      <aside className="w-full shrink-0 lg:w-72">
-        <h3 className="text-sm font-medium text-neutral-500">Contenido del curso</h3>
-        <ol className="mt-2 flex flex-col gap-1">
-          {curso.lecciones.map((l, i) => {
-            const activa = l.slug === leccion.slug;
-            const hecha = completadas.includes(l.slug);
-            return (
-              <li key={l.slug}>
-                <Link
-                  href={`/cursos/${curso.slug}/${l.slug}`}
-                  className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
-                    activa
-                      ? "bg-neutral-900 text-white"
-                      : "text-neutral-700 hover:bg-neutral-100"
-                  }`}
-                >
-                  <span
-                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs ${
-                      activa
-                        ? "bg-white/20"
-                        : hecha
-                        ? "bg-neutral-900 text-white"
-                        : "border border-neutral-300"
-                    }`}
-                  >
-                    {hecha ? "✓" : i + 1}
-                  </span>
-                  <span className="line-clamp-2">{l.titulo}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ol>
-      </aside>
     </div>
   );
 }
