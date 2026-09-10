@@ -13,13 +13,13 @@ export type Curso = {
 
 export const cursos: Curso[] = [
   {
-    slug: "curso-1",
-    titulo: "Curso 1",
+    slug: "constelaciones-familiares",
+    titulo: "Constelaciones Familiares",
     descripcion: "Aprende paso a paso siguiendo el orden de los capítulos.",
     lecciones: [
       {
-        slug: "01-introduccion",
-        titulo: "Capítulo 1: Introducción",
+        slug: "01-seminario-sobre-el-padre",
+        titulo: "Seminario sobre el padre - Constelaciones familiares",
         youtubeId: "LVmkp9gfKK4",
       },
     ],
